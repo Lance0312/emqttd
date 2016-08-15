@@ -165,18 +165,18 @@ in(Msg, MQ = #mqueue{type = simple, q = Q, len = Len}) ->
 in(Msg = #mqtt_message{topic = Topic}, MQ = #mqueue{type = priority, q = Q,
                                                     priorities = Priorities,
                                                     max_len = infinity}) ->
-    case lists:keysearch(Topic, 1, Priorities) of
-        {value, {_, Pri}} ->
+    case lists:dropwhile(fun({Name, _}) -> not emqttd_topic:match(Topic, Name) end, Priorities) of
+        [{_, Pri} | _] ->
             MQ#mqueue{q = priority_queue:in(Msg, Pri, Q)};
-        false ->
+        [] ->
             {Pri, MQ1} = insert_p(Topic, 0, MQ),
             MQ1#mqueue{q = priority_queue:in(Msg, Pri, Q)}
     end;
 in(Msg = #mqtt_message{topic = Topic}, MQ = #mqueue{type = priority, q = Q,
                                                     priorities = Priorities,
                                                     max_len = MaxLen}) ->
-    case lists:keysearch(Topic, 1, Priorities) of
-        {value, {_, Pri}} ->
+    case lists:dropwhile(fun({Name, _}) -> not emqttd_topic:match(Topic, Name) end, Priorities) of
+        [{_, Pri} | _] ->
             case priority_queue:plen(Pri, Q) >= MaxLen of
                 true ->
                     {_, Q1} = priority_queue:out(Pri, Q),
@@ -184,7 +184,7 @@ in(Msg = #mqtt_message{topic = Topic}, MQ = #mqueue{type = priority, q = Q,
                 false ->
                     MQ#mqueue{q = priority_queue:in(Msg, Pri, Q)}
             end;
-        false ->
+        [] ->
             {Pri, MQ1} = insert_p(Topic, 0, MQ),
             MQ1#mqueue{q = priority_queue:in(Msg, Pri, Q)}
     end.
